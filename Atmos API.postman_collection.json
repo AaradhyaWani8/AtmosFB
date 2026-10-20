@@ -1,0 +1,265 @@
+{
+  "info": {
+    "_postman_id": "c322e010-f1f3-49f7-8b26-4a17342d1aa5",
+    "name": "Atmos API",
+    "description": "Postman requests for the Express API in server/. Start MongoDB and the API first. Weather requests require WEATHERAPI_KEY configured on the server. The first admin must be created once from the website's Admin login tab; set credentials only as local Postman environment values.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "location", "value": "Pune" },
+    { "key": "testEmail", "value": "atmos-user@example.test" },
+    { "key": "testPassword", "value": "" },
+    { "key": "adminEmail", "value": "" },
+    { "key": "adminPassword", "value": "" },
+    { "key": "recordId", "value": "000000000000000000000000" },
+    { "key": "stationId", "value": "000000000000000000000000" },
+    { "key": "forecastId", "value": "000000000000000000000000" },
+    { "key": "alertId", "value": "000000000000000000000000" },
+    { "key": "reportId", "value": "000000000000000000000000" },
+    { "key": "rejectReportId", "value": "000000000000000000000000" },
+    { "key": "userId", "value": "000000000000000000000000" }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "API and MongoDB health",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/health",
+            "description": "Returns 200 when MongoDB is connected and 503 while the service is degraded."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('API is healthy and database is connected', function () {", "  pm.response.to.have.status(200);", "  pm.expect(pm.response.json().database).to.eql('connected');", "});"] } }],
+          "response": [{ "name": "Healthy", "originalRequest": { "method": "GET", "url": "{{baseUrl}}/health" }, "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }], "body": "{\n  \"status\": \"ok\",\n  \"service\": \"atmos-api\",\n  \"database\": \"connected\",\n  \"timestamp\": \"2026-10-20T12:00:00.000Z\"\n}" }]
+        }
+      ]
+    },
+    {
+      "name": "WeatherAPI Integration",
+      "item": [
+        {
+          "name": "Current weather by location",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/weather/current?location={{location}}", "description": "Proxies current.json through Express. The WeatherAPI key stays on the server." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Current weather request succeeds', function () { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.have.property('data'); });"] } }],
+          "response": [{ "name": "Current weather example", "originalRequest": { "method": "GET", "url": "{{baseUrl}}/weather/current?location=Pune" }, "status": "OK", "code": 200, "_postman_previewlanguage": "json", "body": "{\n  \"data\": {\n    \"location\": { \"name\": \"Pune\", \"region\": \"Maharashtra\", \"country\": \"India\" },\n    \"current\": { \"temp_c\": 39, \"feelslike_c\": 43, \"humidity\": 48, \"heatindex_c\": 45, \"wind_kph\": 18, \"uv\": 9 }\n  }\n}" }]
+        },
+        {
+          "name": "Forecast by location",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/weather/forecast?location={{location}}&days=3" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Weather forecast request succeeds', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data).to.have.property('forecast'); });"] } }],
+          "response": [{ "name": "Forecast example", "originalRequest": { "method": "GET", "url": "{{baseUrl}}/weather/forecast?location=Pune&days=3" }, "status": "OK", "code": 200, "_postman_previewlanguage": "json", "body": "{\n  \"data\": {\n    \"location\": { \"name\": \"Pune\" },\n    \"forecast\": { \"forecastday\": [{ \"date\": \"2026-10-21\", \"day\": { \"maxtemp_c\": 43, \"mintemp_c\": 27 } }] }\n  }\n}" }]
+        },
+        {
+          "name": "Search locations",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/weather/search?q={{location}}", "description": "Searches WeatherAPI locations through the Express backend." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Location search returns an array', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data).to.be.an('array'); });"] } }]
+        },
+        {
+          "name": "Forecast validation error",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/weather/forecast?location={{location}}&days=99" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Invalid forecast range is rejected', function () { pm.response.to.have.status(400); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Check first-admin setup status",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/auth/admin-bootstrap", "description": "Reports whether first-admin website setup is still available. It closes once the initial admin is created or setup is claimed." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Bootstrap status is returned', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.available).to.be.a('boolean'); });"] } }],
+          "response": [{ "name": "Setup available", "originalRequest": { "method": "GET", "url": "{{baseUrl}}/auth/admin-bootstrap" }, "status": "OK", "code": 200, "_postman_previewlanguage": "json", "body": "{ \"data\": { \"available\": true } }" }]
+        },
+        {
+          "name": "Create first admin (website setup only)",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"First Atmos Admin\",\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/auth/admin-bootstrap", "description": "For API verification only. Normal setup is through the website Login > Admin login > Create the first admin. This one-time route rejects calls after setup is claimed or an admin exists." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('First admin created only when bootstrap is open', function () { pm.response.to.have.status(201); var data = pm.response.json().data; pm.expect(data.user.role).to.eql('admin'); pm.environment.set('adminToken', data.token); });"] } }],
+          "response": [{ "name": "First admin created", "originalRequest": { "method": "POST", "url": "{{baseUrl}}/auth/admin-bootstrap" }, "status": "Created", "code": 201, "_postman_previewlanguage": "json", "body": "{\n  \"data\": {\n    \"user\": { \"id\": \"64f000000000000000000001\", \"name\": \"First Atmos Admin\", \"email\": \"admin@example.test\", \"role\": \"admin\" },\n    \"token\": \"<issued-session-token>\",\n    \"expiresAt\": \"2026-10-27T12:00:00.000Z\"\n  }\n}" }]
+        },
+        {
+          "name": "Register user",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Atmos Postman User\",\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/auth/register", "description": "Public registration always creates a regular user. Set testPassword locally to a value at least 12 characters long." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('User is registered', function () {", "  pm.response.to.have.status(201);", "  var data = pm.response.json().data;", "  pm.expect(data.user.role).to.eql('user');", "  pm.environment.set('token', data.token);", "  pm.environment.set('userId', data.user.id);", "});"] } }],
+          "response": [{ "name": "Created user", "originalRequest": { "method": "POST", "url": "{{baseUrl}}/auth/register" }, "status": "Created", "code": 201, "_postman_previewlanguage": "json", "body": "{\n  \"data\": {\n    \"user\": { \"id\": \"64f000000000000000000001\", \"name\": \"Atmos Postman User\", \"email\": \"atmos-user@example.test\", \"role\": \"user\" },\n    \"token\": \"<issued-session-token>\",\n    \"expiresAt\": \"2026-10-27T12:00:00.000Z\"\n  }\n}" }]
+        },
+        {
+          "name": "Login",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/auth/login" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Login issues a bearer token', function () { pm.response.to.have.status(200); var data = pm.response.json().data; pm.expect(data.token).to.be.a('string'); pm.environment.set('token', data.token); });"] } }],
+          "response": [{ "name": "Login success", "originalRequest": { "method": "POST", "url": "{{baseUrl}}/auth/login" }, "status": "OK", "code": 200, "_postman_previewlanguage": "json", "body": "{\n  \"data\": { \"user\": { \"id\": \"64f000000000000000000001\", \"name\": \"Atmos Postman User\", \"email\": \"atmos-user@example.test\", \"role\": \"user\" }, \"token\": \"<issued-session-token>\", \"expiresAt\": \"2026-10-27T12:00:00.000Z\" }\n}" }]
+        },
+        {
+          "name": "Login validation / invalid credentials",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"nobody@example.test\",\n  \"password\": \"incorrect-placeholder\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/auth/login" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Invalid credentials are rejected', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Registration validation error",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Missing password\",\n  \"email\": \"validation@example.test\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/auth/register" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Registration validation is enforced', function () { pm.response.to.have.status(400); });"] } }]
+        },
+        {
+          "name": "Logout",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/auth/logout", "description": "Revokes the active bearer session. Run after other requests using token." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Session is revoked', function () { pm.response.to.have.status(204); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "User APIs",
+      "item": [
+        {
+          "name": "Get my profile",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/users/me" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Profile is returned', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data).to.have.property('email'); });"] } }]
+        },
+        { "name": "Get authenticated user", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/auth/me" } },
+        {
+          "name": "Update my profile",
+          "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Atmos Updated User\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/me" }
+        },
+        {
+          "name": "Unauthorized profile request",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/users/me" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Missing bearer token is unauthorized', function () { pm.response.to.have.status(401); });"] } }],
+          "response": [{ "name": "Unauthorized", "originalRequest": { "method": "GET", "url": "{{baseUrl}}/users/me" }, "status": "Unauthorized", "code": 401, "_postman_previewlanguage": "json", "body": "{ \"error\": \"Authentication required.\" }" }]
+        },
+        {
+          "name": "Delete my account (destructive)",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/users/me", "description": "Permanently deletes the currently authenticated account and revokes its sessions. Run only when intentionally cleaning up the test user." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Account is deleted', function () { pm.response.to.have.status(204); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Weather Records",
+      "item": [
+        {
+          "name": "List weather records",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/weather-records?location={{location}}" }
+        },
+        {
+          "name": "Create official weather record (admin)",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"location\": \"{{location}}\",\n  \"recordedAt\": \"2026-10-20T12:00:00.000Z\",\n  \"source\": \"AWS-104\",\n  \"temperatureC\": 39,\n  \"feelsLikeC\": 43,\n  \"humidityPct\": 48,\n  \"heatIndexC\": 45,\n  \"windKph\": 18,\n  \"uvIndex\": 9,\n  \"pressureHpa\": 1004,\n  \"aqi\": 132,\n  \"riskLevel\": \"HIGH\",\n  \"notes\": \"Postman sample record\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/weather-records" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Official record created', function () { pm.response.to.have.status(201); pm.environment.set('recordId', pm.response.json().data._id); });"] } }],
+          "response": [{ "name": "Created record", "originalRequest": { "method": "POST", "url": "{{baseUrl}}/weather-records" }, "status": "Created", "code": 201, "_postman_previewlanguage": "json", "body": "{\n  \"data\": { \"_id\": \"64f000000000000000000010\", \"location\": \"Pune\", \"recordedAt\": \"2026-10-20T12:00:00.000Z\", \"source\": \"AWS-104\", \"temperatureC\": 39, \"humidityPct\": 48, \"riskLevel\": \"HIGH\" }\n}" }]
+        },
+        {
+          "name": "Get weather record",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/weather-records/{{recordId}}" }
+        },
+        {
+          "name": "Update weather record",
+          "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"temperatureC\": 40,\n  \"notes\": \"Updated through Postman\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/weather-records/{{recordId}}" }
+        },
+        {
+          "name": "Delete weather record",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/weather-records/{{recordId}}" }
+        },
+        {
+          "name": "Missing record returns 404",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/weather-records/000000000000000000000000" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Missing record returns 404', function () { pm.response.to.have.status(404); });"] } }],
+          "response": [{ "name": "Not found", "originalRequest": { "method": "GET", "url": "{{baseUrl}}/weather-records/000000000000000000000000" }, "status": "Not Found", "code": 404, "_postman_previewlanguage": "json", "body": "{ \"error\": \"Record not found.\" }" }]
+        },
+        {
+          "name": "Non-admin cannot create official record",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"location\": \"{{location}}\" }", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/weather-records" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Non-admin write is forbidden', function () { pm.response.to.have.status(403); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Weather Stations",
+      "item": [
+        { "name": "List stations", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/stations?location={{location}}" } },
+        {
+          "name": "Create station (admin)",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"stationCode\": \"AWS-{{stationSuffix}}\",\n  \"location\": \"{{location}}\",\n  \"status\": \"online\",\n  \"batteryPercent\": 91,\n  \"solarStatus\": \"stable\",\n  \"validationStatus\": \"verified\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/stations" },
+          "event": [{ "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.environment.set('stationSuffix', String(Date.now()).slice(-6));"] } }, { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Station created', function () { pm.response.to.have.status(201); pm.environment.set('stationId', pm.response.json().data._id); });"] } }]
+        },
+        { "name": "Get station", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/stations/{{stationId}}" } },
+        { "name": "Update station", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"maintenance\", \"batteryPercent\": 80 }", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/stations/{{stationId}}" } },
+        { "name": "Delete station", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/stations/{{stationId}}" } }
+      ]
+    },
+    {
+      "name": "Forecasts",
+      "item": [
+        { "name": "List official forecasts", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/forecasts?location={{location}}" } },
+        {
+          "name": "Create forecast (admin)",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"location\": \"{{location}}\",\n  \"forecastDate\": \"2026-10-21T00:00:00.000Z\",\n  \"minTempC\": 27,\n  \"maxTempC\": 43,\n  \"heatwaveProbability\": 82,\n  \"confidence\": 91,\n  \"riskLevel\": \"HIGH\",\n  \"source\": \"Atmos model\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/forecasts" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Forecast created', function () { pm.response.to.have.status(201); pm.environment.set('forecastId', pm.response.json().data._id); });"] } }]
+        },
+        { "name": "Get forecast", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/forecasts/{{forecastId}}" } },
+        { "name": "Update forecast", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"maxTempC\": 44, \"riskLevel\": \"EXTREME\" }", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/forecasts/{{forecastId}}" } },
+        { "name": "Delete forecast", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/forecasts/{{forecastId}}" } }
+      ]
+    },
+    {
+      "name": "Alerts and Advisories",
+      "item": [
+        { "name": "List alerts", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/alerts?location={{location}}" } },
+        {
+          "name": "Create alert (admin)",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"location\": \"{{location}}\",\n  \"title\": \"High heat advisory\",\n  \"message\": \"Limit outdoor activity during peak afternoon heat.\",\n  \"severity\": \"HIGH\",\n  \"startsAt\": \"2026-10-20T12:00:00.000Z\",\n  \"status\": \"published\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/alerts" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Alert created', function () { pm.response.to.have.status(201); pm.environment.set('alertId', pm.response.json().data._id); });"] } }]
+        },
+        { "name": "Get alert", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/alerts/{{alertId}}" } },
+        { "name": "Update alert", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"status\": \"expired\" }", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/alerts/{{alertId}}" } },
+        { "name": "Delete alert", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/alerts/{{alertId}}" } }
+      ]
+    },
+    {
+      "name": "Discrepancy Reports",
+      "item": [
+        {
+          "name": "Submit report for approval",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"location\": \"{{location}}\",\n  \"category\": \"temperature\",\n  \"description\": \"Observed temperature differs from the official record.\",\n  \"observedAt\": \"2026-10-20T12:00:00.000Z\",\n  \"proposedData\": { \"temperatureC\": 37 }\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/discrepancies" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Discrepancy report submitted', function () { pm.response.to.have.status(201); pm.environment.set('reportId', pm.response.json().data._id); });"] } }],
+          "response": [{ "name": "Pending report", "originalRequest": { "method": "POST", "url": "{{baseUrl}}/discrepancies" }, "status": "Created", "code": 201, "_postman_previewlanguage": "json", "body": "{\n  \"data\": { \"_id\": \"64f000000000000000000020\", \"location\": \"Pune\", \"category\": \"temperature\", \"description\": \"Observed temperature differs from the official record.\", \"status\": \"pending\" }\n}" }]
+        },
+        { "name": "List my reports (admin sees all)", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/discrepancies?status=pending" } },
+        { "name": "Get report", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/discrepancies/{{reportId}}" } },
+        { "name": "Approve report (admin)", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"reviewNote\": \"Verified against station telemetry.\" }", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/discrepancies/{{reportId}}/approve" } },
+        {
+          "name": "Submit report for rejection",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"location\": \"Mumbai\",\n  \"category\": \"station\",\n  \"description\": \"Station status appears incorrect.\",\n  \"observedAt\": \"2026-10-20T12:00:00.000Z\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/discrepancies" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Second report submitted', function () { pm.response.to.have.status(201); pm.environment.set('rejectReportId', pm.response.json().data._id); });"] } }]
+        },
+        { "name": "Reject report (admin)", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"reviewNote\": \"Unable to verify this observation.\" }", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/discrepancies/{{rejectReportId}}/reject" } }
+      ]
+    },
+    {
+      "name": "Admin APIs",
+      "item": [
+        {
+          "name": "Login as website-created admin",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/auth/login", "description": "Create the first admin from the website's Admin login tab, then save credentials only in the local Postman environment." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Admin login succeeds', function () { pm.response.to.have.status(200); pm.expect(pm.response.json().data.user.role).to.eql('admin'); pm.environment.set('adminToken', pm.response.json().data.token); });"] } }]
+        },
+        { "name": "Admin overview", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/admin/overview" } },
+        { "name": "List users", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/admin/users?limit=20" } },
+        { "name": "Set user active/inactive or role", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{ \"active\": true }", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/admin/users/{{userId}}" } },
+        { "name": "Count active sessions", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/admin/sessions" } },
+        {
+          "name": "Delete user (admin, destructive)",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/admin/users/{{userId}}", "description": "Permanently deletes the selected account and its sessions. Run only when intentionally cleaning up the test user." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('User is deleted', function () { pm.response.to.have.status(204); });"] } }]
+        },
+        {
+          "name": "Forbidden admin request as regular user",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/admin/overview" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Regular user is forbidden from admin API', function () { pm.response.to.have.status(403); });"] } }],
+          "response": [{ "name": "Forbidden", "originalRequest": { "method": "GET", "url": "{{baseUrl}}/admin/overview" }, "status": "Forbidden", "code": 403, "_postman_previewlanguage": "json", "body": "{ \"error\": \"Administrator access required.\" }" }]
+        }
+      ]
+    }
+  ]
+}
